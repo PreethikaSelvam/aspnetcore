@@ -55,6 +55,9 @@ function boot(options?: Partial<WebStartOptions>) : Promise<void> {
   rootComponentManager = new WebRootComponentManager(options?.ssr?.circuitInactivityTimeoutMs ?? 2000);
   const jsEventRegistry = JSEventRegistry.create(Blazor);
 
+    // Store jsEventRegistry on Blazor._internal so it can be accessed from BrowserRenderer
+  (Blazor._internal as any).jsEventRegistry = jsEventRegistry;
+
   const navigationEnhancementCallbacks: NavigationEnhancementCallbacks = {
     enhancedNavigationStarted: () => {
       jsEventRegistry.dispatchEvent('enhancednavigationstart', {});

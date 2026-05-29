@@ -9,11 +9,19 @@ interface BlazorEvent {
   type: keyof BlazorEventMap;
 }
 
+// Event dispatched when a Blazor component becomes interactive.
+interface ComponentInteractiveEvent extends BlazorEvent {
+  element: Element;
+  renderingMode?: string;
+  componentId: number;
+}
+
 // Maps Blazor event names to the argument type passed to registered listeners.
 export interface BlazorEventMap {
   'enhancedload': BlazorEvent,
   'enhancednavigationstart': BlazorEvent,
   'enhancednavigationend': BlazorEvent,
+  'componentinteractive': ComponentInteractiveEvent,
 }
 
 export class JSEventRegistry {

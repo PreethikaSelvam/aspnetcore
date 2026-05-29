@@ -337,11 +337,28 @@ export class BrowserRenderer {
     if (eventHandlerId) {
       const eventName = stripOnPrefix(attributeName);
       this.eventDelegator.setListener(toDomElement, eventName, eventHandlerId, componentId);
+      // Dispatch the componentinteractive event to signal that this element has become interactive
+      this.dispatchComponentInteractiveEvent(toDomElement, componentId);
       return;
     }
 
     const value = frameReader.attributeValue(attributeFrame);
     this.setOrRemoveAttributeOrProperty(toDomElement, attributeName, value);
+  }
+
+  private dispatchComponentInteractiveEvent(element: Element, componentId: number): void {
+    try {
+      const jsEventRegistry = (window as any).Blazor?._internal?.jsEventRegistry;
+      if (jsEventRegistry && jsEventRegistry.dispatchEvent) {
+        jsEventRegistry.dispatchEvent('componentinteractive', {
+          element: element,
+          componentId: componentId,
+          renderingMode: 'Interactive',
+        });
+      }
+    } catch {
+      // Silently ignore errors to avoid breaking component rendering
+    }
   }
 
   private insertFrameRange(batch: RenderBatch, componentId: number, parent: LogicalElement, childIndex: number, frames: ArrayValues<RenderTreeFrame>, startIndex: number, endIndexExcl: number): number {
