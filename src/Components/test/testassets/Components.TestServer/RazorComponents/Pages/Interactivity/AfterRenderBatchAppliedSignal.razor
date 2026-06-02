@@ -1,0 +1,11 @@
+@page "/after-render-batch-applied-signal"
+
+<h1>After Render Batch Applied Signal</h1>
+
+<p>This page tests the <code>afterAllRenderBatchesApplied</code> JS event that fires every time
+Blazor finishes applying a render batch to the DOM, enabling E2E tests to reliably detect
+when interactive components have become active.</p>
+
+<div>
+    <ServerInteractiveCounter IncrementAmount="1" />
+</div>
