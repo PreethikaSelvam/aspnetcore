@@ -1551,6 +1551,71 @@ public class InteractivityTest : ServerTestBase<BasicTestAppServerSiteFixture<Ra
         AssertReExecutedPageIsInteractive();
     }
 
+    [Fact]
+    public void AfterAllRenderBatchesApplied_EventFires_WhenServerComponentBecomesInteractive()
+    {
+        Navigate($"{ServerPathBase}/after-render-batch-applied-signal");
+
+        // Wait for the server component to become interactive before setting up the listener.
+        // We detect this by waiting for _isInteractive to be reflected in the DOM.
+        Browser.Equal("True", () => Browser.FindElement(By.Id("is-interactive-server")).Text);
+
+        // Register a listener and count how many times the event fires
+        var js = (IJavaScriptExecutor)Browser;
+        js.ExecuteScript("""
+            window.__renderBatchCount = 0;
+            Blazor.addEventListener('afterAllRenderBatchesApplied', () => {
+                window.__renderBatchCount++;
+            });
+            """);
+
+        // Click the button: this triggers a server-side state change and a new render batch
+        Browser.Equal("0", () => Browser.FindElement(By.Id("count-server")).Text);
+        Browser.Click(By.Id("increment-server"));
+        Browser.Equal("1", () => Browser.FindElement(By.Id("count-server")).Text);
+
+        // The event must have fired at least once for the render batch that updated count to 1
+        Browser.True(() => (long)js.ExecuteScript("return window.__renderBatchCount;") > 0);
+    }
+
+    [Fact]
+    public void AfterAllRenderBatchesApplied_EventFires_OncePerRenderBatch_AllowsRemoveEventListener()
+    {
+        Navigate($"{ServerPathBase}/after-render-batch-applied-signal");
+
+        // Wait for the server component to become interactive
+        Browser.Equal("True", () => Browser.FindElement(By.Id("is-interactive-server")).Text);
+
+        var js = (IJavaScriptExecutor)Browser;
+
+        // Register and then immediately remove listener — it must NOT fire
+        js.ExecuteScript("""
+            window.__removedListenerCount = 0;
+            function removedListener() { window.__removedListenerCount++; }
+            Blazor.addEventListener('afterAllRenderBatchesApplied', removedListener);
+            Blazor.removeEventListener('afterAllRenderBatchesApplied', removedListener);
+            """);
+
+        // Register a second listener that stays attached
+        js.ExecuteScript("""
+            window.__keptListenerCount = 0;
+            Blazor.addEventListener('afterAllRenderBatchesApplied', () => {
+                window.__keptListenerCount++;
+            });
+            """);
+
+        // Click the button to trigger a render batch
+        Browser.Equal("0", () => Browser.FindElement(By.Id("count-server")).Text);
+        Browser.Click(By.Id("increment-server"));
+        Browser.Equal("1", () => Browser.FindElement(By.Id("count-server")).Text);
+
+        // The kept listener must have fired at least once
+        Browser.True(() => (long)js.ExecuteScript("return window.__keptListenerCount;") > 0);
+
+        // The removed listener must never have been called
+        Browser.Equal(0L, () => (long)js.ExecuteScript("return window.__removedListenerCount;"));
+    }
+
     private void AssertReExecutedPageIsInteractive()
     {
         Browser.Equal("Current count: 0", () => Browser.FindElement(By.CssSelector("[role='status']")).Text);

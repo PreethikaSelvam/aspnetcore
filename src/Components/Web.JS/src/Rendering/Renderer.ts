@@ -7,6 +7,7 @@ import { RenderBatch } from './RenderBatch/RenderBatch';
 import { BrowserRenderer } from './BrowserRenderer';
 import { toLogicalElement, LogicalElement } from './LogicalElements';
 import { getAndRemovePendingRootComponentContainer } from './JSRootComponents';
+import { JSEventRegistry } from '../Services/JSEventRegistry';
 
 interface BrowserRendererRegistry {
   [browserRendererId: number]: BrowserRenderer;
@@ -20,6 +21,11 @@ export enum ScrollResetSchedule {
 
 const browserRenderers: BrowserRendererRegistry = {};
 let pendingScrollResetTiming: ScrollResetSchedule = ScrollResetSchedule.None;
+let jsEventRegistry: JSEventRegistry | undefined;
+
+export function setRenderBatchJSEventRegistry(registry: JSEventRegistry): void {
+  jsEventRegistry = registry;
+}
 
 export function attachRootComponentToLogicalElement(browserRendererId: number, logicalElement: LogicalElement, componentId: number, appendContent: boolean): void {
   let browserRenderer = browserRenderers[browserRendererId];
@@ -96,6 +102,11 @@ export function renderBatch(browserRendererId: number, batch: RenderBatch): void
   }
 
   resetScrollIfNeeded(ScrollResetSchedule.AfterBatch);
+
+  // Signal that all DOM updates from this render batch have been applied.
+  // This allows E2E tests and other JS code to reliably detect when interactive
+  // components have been rendered without polling internal Blazor implementation details.
+  jsEventRegistry?.dispatchEvent('afterAllRenderBatchesApplied', {});
 }
 
 export function scheduleScrollReset(timing: ScrollResetSchedule): void {
