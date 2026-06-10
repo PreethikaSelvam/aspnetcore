@@ -1,0 +1,90 @@
+@page "/persistent-state/counter-test"
+@rendermode RenderMode.InteractiveWebAssembly
+@inject NavigationManager Navigation
+@using System
+
+<PageTitle>Persistent Counter Test</PageTitle>
+
+<h1>Persistent Counter - BUG FIX VERIFICATION</h1>
+
+<div class="alert alert-primary" role="alert">
+    This component tests the fix for [PersistentState(AllowUpdates = true)] with enhanced navigation.
+    <br />
+    The counter value should persist when navigating between pages.
+</div>
+
+<div class="card" style="width: 18rem;">
+    <div class="card-body">
+        <h5 class="card-title">Current Count</h5>
+        <p class="display-4" id="counter-value">@CurrentCount</p>
+
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-primary" @onclick="IncrementCount">
+                Increment
+            </button>
+            <button type="button" class="btn btn-danger" @onclick="ResetCount">
+                Reset
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <p id="status-message">Status: @StatusMessage</p>
+    <p id="debug-info">Debug: Init Count = @InitCount, Regenerations = @RegenerateCount</p>
+</div>
+
+<button type="button" class="btn btn-secondary mt-3" @onclick="GoToOtherPage" id="navigate-away">
+    Navigate Away
+</button>
+
+@code {
+    [PersistentState(AllowUpdates = true)]
+    public int CurrentCount { get; set; }
+
+    private string StatusMessage = "Not initialized";
+    private int InitCount = 0;
+    private int RegenerateCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitCount++;
+
+        // THE FIX: This check should work correctly
+        if (CurrentCount > 0)
+        {
+            StatusMessage = $"✓ Using restored value: {CurrentCount}";
+            Console.WriteLine($"[CounterTest] Skipping regeneration - using restored value: {CurrentCount}");
+            return;
+        }
+
+        // This should only execute on first load, not on navigation
+        StatusMessage = "Regenerating data...";
+        RegenerateCount++;
+
+        Console.WriteLine("[CounterTest] No persisted value - regenerating");
+        await Task.Delay(500);
+
+        CurrentCount = 0;
+        StatusMessage = "✓ Initialized";
+    }
+
+    private void IncrementCount()
+    {
+        CurrentCount++;
+        StatusMessage = "✓ Incremented";
+    }
+
+    private void ResetCount()
+    {
+        CurrentCount = 0;
+        InitCount = 0;
+        RegenerateCount = 0;
+        StatusMessage = "✓ Reset";
+    }
+
+    private void GoToOtherPage()
+    {
+        Navigation.NavigateTo("/", forceLoad: false);
+    }
+}

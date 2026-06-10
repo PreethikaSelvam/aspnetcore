@@ -91,6 +91,12 @@ internal partial class PersistentValueProviderComponentSubscription : IDisposabl
             {
                 RestoreProperty();
                 _hasPendingInitialValue = false;
+                // Return the restored value immediately so that the cascading parameter
+                // receives the correct value before OnInitializedAsync runs. This ensures that
+                // components checking the property value during initialization see the
+                // restored state rather than null/default, preventing unnecessary regeneration
+                // of data during enhanced navigation with AllowUpdates = true.
+                return _lastValue;
             }
         }
         else

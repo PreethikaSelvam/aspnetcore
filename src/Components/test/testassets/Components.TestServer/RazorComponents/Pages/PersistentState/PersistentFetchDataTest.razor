@@ -1,0 +1,122 @@
+@page "/persistent-state/fetchdata-test"
+@rendermode RenderMode.InteractiveWebAssembly
+@inject NavigationManager Navigation
+
+<PageTitle>Persistent Fetch Data Test</PageTitle>
+
+<h1>Persistent Fetch Data - BUG FIX VERIFICATION</h1>
+
+<div class="alert alert-primary" role="alert">
+    This component tests the fix by caching data once and persisting it across navigations.
+    <br />
+    The data should be restored without regenerating.
+</div>
+
+@if (CachedValues == null || CachedValues.Length == 0)
+{
+    <p id="loading-text"><strong>Loading...</strong></p>
+}
+else
+{
+    <p id="data-status">✓ Data loaded successfully</p>
+    <table class="table table-striped" id="forecast-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Temp (C)</th>
+                <th>Temp (F)</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in CachedValues)
+            {
+                <tr>
+                    <td>@item["date"]</td>
+                    <td>@item["temp"]</td>
+                    <td>@item["tempF"]</td>
+                    <td>@item["summary"]</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="mt-3">
+    <p id="fetch-info">Fetch Count: @FetchCount | Status: @StatusMessage</p>
+</div>
+
+<button type="button" class="btn btn-primary" @onclick="RefreshData" id="refresh-button">
+    Refresh Data
+</button>
+<button type="button" class="btn btn-secondary" @onclick="GoToOtherPage" id="navigate-away-fetch">
+    Navigate Away
+</button>
+
+@code {
+    private Dictionary<string, string>[] CachedValues;
+    private int FetchCount = 0;
+    private string StatusMessage = "Not initialized";
+
+    [PersistentState(AllowUpdates = true)]
+    public string CachedData { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // THE FIX: This check should work correctly
+        if (!string.IsNullOrEmpty(CachedData))
+        {
+            StatusMessage = $"✓ Using cached data";
+            Console.WriteLine("[FetchTest] Using cached data - not regenerating");
+            
+            try
+            {
+                CachedValues = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>[]>(
+                    CachedData);
+            }
+            catch
+            {
+                CachedValues = Array.Empty<Dictionary<string, string>>();
+            }
+            
+            return;
+        }
+
+        // This should only execute on first load
+        StatusMessage = "Generating data...";
+        Console.WriteLine("[FetchTest] No cached data - generating");
+        
+        GenerateData();
+    }
+
+    private void GenerateData()
+    {
+        var random = new Random();
+        CachedValues = Enumerable.Range(1, 5).Select(index => new Dictionary<string, string>
+        {
+            ["date"] = DateTime.Now.AddDays(index).ToShortDateString(),
+            ["temp"] = random.Next(-20, 55).ToString(),
+            ["tempF"] = (32 + (int)(random.Next(-20, 55) / 0.5556)).ToString(),
+            ["summary"] = Summaries[random.Next(Summaries.Length)]
+        }).ToArray();
+        
+        CachedData = System.Text.Json.JsonSerializer.Serialize(CachedValues);
+        FetchCount++;
+        StatusMessage = $"✓ Generated ({FetchCount} times)";
+    }
+
+    private void RefreshData()
+    {
+        GenerateData();
+    }
+
+    private void GoToOtherPage()
+    {
+        Navigation.NavigateTo("/", forceLoad: false);
+    }
+
+    private static readonly string[] Summaries = new[]
+    {
+        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+    };
+}
