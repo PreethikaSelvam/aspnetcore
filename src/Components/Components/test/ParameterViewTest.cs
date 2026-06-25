@@ -219,7 +219,7 @@ public partial class ParameterViewTest
     }
 
     [Fact]
-    public void ThrowsIfTryGetExistingValueWithIncorrectType()
+    public void TryGetValue_ReturnsFalse_WhenTypeMismatch()
     {
         // Arrange
         var parameters = new ParameterView(ParameterViewLifetime.Unbound, new[]
@@ -228,11 +228,10 @@ public partial class ParameterViewTest
             RenderTreeFrame.Attribute(1, "my entry", "hello")
         }, 0);
 
-        // Act/Assert
-        Assert.Throws<InvalidCastException>(() =>
-        {
-            parameters.TryGetValue<bool>("my entry", out var value);
-        });
+        var found = parameters.TryGetValue<bool>("my entry", out var value);
+
+        Assert.False(found);
+        Assert.False(value); // default(bool)
     }
 
     [Fact]
@@ -566,6 +565,93 @@ public partial class ParameterViewTest
 
         // Assert
         Assert.False(hasRemovedDirectParameters);
+    }
+
+    [Fact]
+    public void TryGetValue_ReturnsFalse_WithIncorrectType()
+    {
+        var parameters = new ParameterView(ParameterViewLifetime.Unbound, new[]
+        {
+            RenderTreeFrame.Element(0, "some element").WithElementSubtreeLength(2),
+            RenderTreeFrame.Attribute(1, "DebounceInterval", 500)
+        }, 0);
+
+        var found = parameters.TryGetValue<double>("DebounceInterval", out var value);
+
+        Assert.False(found);
+        Assert.Equal(default, value); // 0.0
+    }
+
+    [Fact]
+    public void TryGetValue_AllowsNullValue_ForNullableOrReferenceType()
+    {
+        var parameters = new ParameterView(ParameterViewLifetime.Unbound, new[]
+        {
+            RenderTreeFrame.Element(0, "some element").WithElementSubtreeLength(2),
+            RenderTreeFrame.Attribute(1, "MyParam", null)
+        }, 0);
+
+        var found = parameters.TryGetValue<string>("MyParam", out var value);
+        Assert.True(found);
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public void TryGetValue_AssignsDefault_ForNullableValueType_WhenNull()
+    {
+        var parameters = new ParameterView(ParameterViewLifetime.Unbound, new[]
+        {
+            RenderTreeFrame.Element(0, "some element").WithElementSubtreeLength(2),
+            RenderTreeFrame.Attribute(1, "MyParam", null)
+        }, 0);
+
+        var found = parameters.TryGetValue<int?>("MyParam", out var value);
+        Assert.True(found);
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public void TryGetValue_ReturnsFalse_ForNumericTypeMismatch()
+    {
+        var parameters = ParameterView.FromDictionary(new Dictionary<string, object>
+        {
+            { "Value", 10 } // int
+        });
+
+        var found = parameters.TryGetValue<double>("Value", out var value);
+
+        Assert.False(found);
+        Assert.Equal(default, value);
+    }
+
+    [Fact]
+    public void TryGetValue_AllowsAssignableReferenceTypes()
+    {
+        object input = "hello";
+
+        var parameters = ParameterView.FromDictionary(new Dictionary<string, object>
+        {
+            { "Value", input }
+        });
+
+        var found = parameters.TryGetValue<object>("Value", out var value);
+
+        Assert.True(found);
+        Assert.Equal(input, value);
+    }
+
+    [Fact]
+    public void TryGetValue_ReturnsFalse_ForNonNullableValueType_WhenNull()
+    {
+        var parameters = ParameterView.FromDictionary(new Dictionary<string, object>
+        {
+            { "Value", null }
+        });
+
+        var found = parameters.TryGetValue<int>("Value", out var value);
+
+        Assert.False(found);
+        Assert.Equal(default, value);
     }
 
     private Action<ParameterValue> AssertParameter(string expectedName, object expectedValue, bool expectedIsCascading)

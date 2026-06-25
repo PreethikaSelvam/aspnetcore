@@ -583,8 +583,26 @@ public class ComponentBaseTest
         Assert.Same(expected, actual);
     }
 
+    [Fact]
+    public void SetParametersAsync_ThrowsClearError_OnInvalidType()
+    {
+        var component = new TestComponent();
+
+        var parameters = ParameterView.FromDictionary(new Dictionary<string, object>
+        {
+            { "Value", 10 } // int instead of double
+        });
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            component.SetParametersAsync(parameters).GetAwaiter().GetResult());
+
+        Assert.Contains("Unable to set property 'Value'", ex.Message);
+    }
+
     private class TestComponent : ComponentBase
     {
+        [Parameter]
+        public double Value { get; set; }
+
         public bool RunsBaseOnInit { get; set; } = true;
 
         public bool RunsBaseOnInitAsync { get; set; } = true;
