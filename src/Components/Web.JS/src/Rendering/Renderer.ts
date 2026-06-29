@@ -102,10 +102,6 @@ export function renderBatch(browserRendererId: number, batch: RenderBatch): void
   }
 
   resetScrollIfNeeded(ScrollResetSchedule.AfterBatch);
-
-  // Signal that all DOM updates from this render batch have been applied.
-  // This allows E2E tests and other JS code to reliably detect when interactive
-  // components have been rendered without polling internal Blazor implementation details.
   jsEventRegistry?.dispatchEvent('afterAllRenderBatchesApplied', {});
 }
 
