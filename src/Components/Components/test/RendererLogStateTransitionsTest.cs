@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.AspNetCore.Components.Rendering;
-using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -203,35 +202,36 @@ public class RendererLogStateTransitionsTest
         Renderer.Log.SkippingCascadingUpdateOnDisposedComponent(mockLogger.Object, componentState);
         Renderer.Log.StoppedSingleDeliveryCascadingParameters(mockLogger.Object, componentState);
         Renderer.Log.SkippingRenderOnDisposedComponent(mockLogger.Object, componentState);
+        Renderer.Log.SupplyingCombinedParameters(mockLogger.Object, componentState);
 
         Assert.Collection(capturedEventIds,
             eventId => Assert.Equal(7, eventId.Id),
             eventId => Assert.Equal(8, eventId.Id),
-            eventId => Assert.Equal(9, eventId.Id));
+            eventId => Assert.Equal(9, eventId.Id),
+            eventId => Assert.Equal(10, eventId.Id));
     }
 
     [Fact]
-    public void SkippingCascadingUpdateOnDisposedComponent_UsesEventId7()
+    public void SupplyingCombinedParameters_LogsAtTraceWhenEnabled()
     {
-        // Explicitly verify EventId 7
         var mockLogger = new Mock<ILogger>();
         var component = new SimpleComponent();
         var componentState = new ComponentState(
             new MockRenderer(),
-            componentId: 42,
+            componentId: 7,
             component: component,
             parentComponentState: null);
 
         mockLogger
-            .Setup(l => l.IsEnabled(LogLevel.Debug))
+            .Setup(l => l.IsEnabled(LogLevel.Trace))
             .Returns(true);
 
-        Renderer.Log.SkippingCascadingUpdateOnDisposedComponent(mockLogger.Object, componentState);
+        Renderer.Log.SupplyingCombinedParameters(mockLogger.Object, componentState);
 
         mockLogger.Verify(
             l => l.Log(
-                LogLevel.Debug,
-                It.Is<EventId>(e => e.Id == 7),
+                LogLevel.Trace,
+                It.Is<EventId>(e => e.Id == 10),
                 It.IsAny<It.IsAnyType>(),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception, string>>()),
@@ -239,59 +239,30 @@ public class RendererLogStateTransitionsTest
     }
 
     [Fact]
-    public void StoppedSingleDeliveryCascadingParameters_UsesEventId8()
+    public void SupplyingCombinedParameters_DoesNotLogWhenTraceDisabled()
     {
-        // Explicitly verify EventId 8
         var mockLogger = new Mock<ILogger>();
         var component = new SimpleComponent();
         var componentState = new ComponentState(
             new MockRenderer(),
-            componentId: 5,
+            componentId: 7,
             component: component,
             parentComponentState: null);
 
         mockLogger
-            .Setup(l => l.IsEnabled(LogLevel.Debug))
-            .Returns(true);
+            .Setup(l => l.IsEnabled(LogLevel.Trace))
+            .Returns(false);
 
-        Renderer.Log.StoppedSingleDeliveryCascadingParameters(mockLogger.Object, componentState);
-
-        mockLogger.Verify(
-            l => l.Log(
-                LogLevel.Debug,
-                It.Is<EventId>(e => e.Id == 8),
-                It.IsAny<It.IsAnyType>(),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public void SkippingRenderOnDisposedComponent_UsesEventId9()
-    {
-        // Explicitly verify EventId 9
-        var mockLogger = new Mock<ILogger>();
-        var component = new SimpleComponent();
-        var componentState = new ComponentState(
-            new MockRenderer(),
-            componentId: 100,
-            component: component,
-            parentComponentState: null);
-
-        mockLogger
-            .Setup(l => l.IsEnabled(LogLevel.Debug))
-            .Returns(true);
-
-        Renderer.Log.SkippingRenderOnDisposedComponent(mockLogger.Object, componentState);
+        Renderer.Log.SupplyingCombinedParameters(mockLogger.Object, componentState);
 
         mockLogger.Verify(
             l => l.Log(
-                LogLevel.Debug,
-                It.Is<EventId>(e => e.Id == 9),
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
                 It.IsAny<It.IsAnyType>(),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception, string>>()),
-            Times.Once);
+            Times.Never);
     }
 
     private class SimpleComponent : IComponent

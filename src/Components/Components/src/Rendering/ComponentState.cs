@@ -245,6 +245,8 @@ public class ComponentState : IAsyncDisposable
     // a consistent set to the recipient.
     private void SupplyCombinedParameters(ParameterView directAndCascadingParameters)
     {
+        Renderer.Log.SupplyingCombinedParameters(_renderer.Logger, this);
+
         var parametersStartTimestamp = ComponentsMetrics.IsSupported && _renderer.ComponentMetrics != null && _renderer.ComponentMetrics.IsParametersEnabled ? Stopwatch.GetTimestamp() : 0;
 
         // Normalize sync and async exceptions into a Task

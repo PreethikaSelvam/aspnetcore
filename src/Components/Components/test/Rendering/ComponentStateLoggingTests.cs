@@ -72,19 +72,90 @@ public class ComponentStateLoggingTests
     }
 
     [Fact]
-    public void ComponentState_LogsComponentIdentityCorrectly()
+    public void SetDirectParameters_LogsSupplyingCombinedParametersAtTrace()
     {
         var mockLogger = new Mock<ILogger>();
         var mockRenderer = new MockRenderer(mockLogger.Object);
         var component = new TestComponent();
-        var componentId = 42;
-        var componentState = new ComponentState(mockRenderer, componentId, component, null);
+        var componentState = new ComponentState(mockRenderer, 1, component, null);
 
-        var capturedMessages = new List<string>();
+        mockLogger.Reset();
+        mockLogger
+            .Setup(l => l.IsEnabled(LogLevel.Trace))
+            .Returns(true);
+
+        componentState.SetDirectParameters(ParameterView.Empty);
+
+        mockLogger.Verify(
+            l => l.Log(
+                LogLevel.Trace,
+                It.Is<EventId>(e => e.Id == 10),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+            Times.AtLeastOnce,
+            "Expected SupplyingCombinedParameters (EventId 10) to be logged at Trace level when parameters are supplied");
+    }
+
+    [Fact]
+    public void SetDirectParameters_WithSingleDeliveryParam_LogsStoppedSingleDeliveryAndSupplying()
+    {
+        var mockLogger = new Mock<ILogger>();
+        var mockRenderer = new MockRenderer(mockLogger.Object);
+
+        var supplier = new SingleDeliverySupplierComponent(isFixed: true);
+        var supplierState = new ComponentState(mockRenderer, 1, supplier, null);
+
+        var consumer = new SingleDeliveryConsumerComponent();
+        var consumerState = new ComponentState(mockRenderer, 2, consumer, supplierState);
+
+        mockLogger.Reset();
         mockLogger
             .Setup(l => l.IsEnabled(It.IsAny<LogLevel>()))
             .Returns(true);
 
+        consumerState.SetDirectParameters(ParameterView.Empty);
+
+        mockLogger.Verify(
+            l => l.Log(
+                LogLevel.Debug,
+                It.Is<EventId>(e => e.Id == 8),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+            Times.Once,
+            "Expected StoppedSingleDeliveryCascadingParameters (EventId 8) to be logged when a single-delivery cascading parameter is consumed");
+
+        mockLogger.Verify(
+            l => l.Log(
+                LogLevel.Trace,
+                It.Is<EventId>(e => e.Id == 10),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+            Times.AtLeastOnce,
+            "Expected SupplyingCombinedParameters (EventId 10) to be logged after single-delivery teardown");
+    }
+
+    [Fact]
+    public async Task FullLifecycle_LogsAllFourStateTransitionsInSequence()
+    {
+        var mockLogger = new Mock<ILogger>();
+        var mockRenderer = new MockRenderer(mockLogger.Object);
+
+        var supplier = new SingleDeliverySupplierComponent(isFixed: true);
+        var supplierState = new ComponentState(mockRenderer, 1, supplier, null);
+
+        var consumer = new SingleDeliveryConsumerComponent();
+        var consumerState = new ComponentState(mockRenderer, 2, consumer, supplierState);
+
+        var batchBuilder = new RenderBatchBuilder();
+        var capturedEventIds = new List<int>();
+
+        mockLogger.Reset();
+        mockLogger
+            .Setup(l => l.IsEnabled(It.IsAny<LogLevel>()))
+            .Returns(true);
         mockLogger
             .Setup(l => l.Log(
                 It.IsAny<LogLevel>(),
@@ -94,26 +165,25 @@ public class ComponentStateLoggingTests
                 It.IsAny<Func<It.IsAnyType, Exception, string>>()))
             .Callback((LogLevel level, EventId eventId, object state, Exception exception, Delegate formatter) =>
             {
-                if (formatter != null)
-                {
-                    var message = formatter.DynamicInvoke(state, exception) as string;
-                    if (message is not null)
-                    {
-                        capturedMessages.Add(message);
-                    }
-                }
+                capturedEventIds.Add(eventId.Id);
             });
 
-        _ = componentState.DisposeAsync();
-        var batchBuilder = new RenderBatchBuilder();
-        RenderFragment renderFragment = builder => { };
-        componentState.RenderIntoBatch(batchBuilder, renderFragment, out var ex);
+        consumerState.SetDirectParameters(ParameterView.Empty);
+        await consumerState.DisposeAsync();
+        consumerState.NotifyCascadingValueChanged(ParameterViewLifetime.Unbound);
+        consumerState.RenderIntoBatch(batchBuilder, builder => { }, out _);
 
-        var relevantMessages = capturedMessages
-            .Where(msg => msg.Contains(componentId.ToString(System.Globalization.CultureInfo.InvariantCulture)) || msg.Contains("Skipping"))
-            .ToList();
+        Assert.Contains(7, capturedEventIds);
+        Assert.Contains(8, capturedEventIds);
+        Assert.Contains(9, capturedEventIds);
+        Assert.Contains(10, capturedEventIds);
 
-        Assert.NotEmpty(relevantMessages);
+        var firstSkipIndex = Math.Min(capturedEventIds.IndexOf(7), capturedEventIds.IndexOf(9));
+        var lastSupplyIndex = Math.Max(
+            capturedEventIds.LastIndexOf(8),
+            capturedEventIds.LastIndexOf(10));
+        Assert.True(firstSkipIndex > lastSupplyIndex,
+            $"Disposal-skip events (7, 9) should occur after supply events (8, 10). Actual order: [{string.Join(", ", capturedEventIds)}]");
     }
 
     private class TestComponent : ComponentBase
@@ -204,5 +274,40 @@ public class ComponentStateLoggingTests
         public ILogger CreateLogger(string categoryName) => _logger;
 
         public void Dispose() { }
+    }
+
+    private sealed class TestSingleDeliveryAttribute : CascadingParameterAttributeBase
+    {
+        internal override bool SingleDelivery => true;
+    }
+
+    private class SingleDeliverySupplierComponent(bool isFixed) : ComponentBase, ICascadingValueSupplier
+    {
+        public bool IsFixed => isFixed;
+
+        public bool CanSupplyValue(in CascadingParameterInfo parameterInfo)
+            => parameterInfo.Attribute is TestSingleDeliveryAttribute;
+
+        public object GetCurrentValue(object key, in CascadingParameterInfo parameterInfo)
+            => null;
+
+        public void Subscribe(ComponentState subscriber, in CascadingParameterInfo parameterInfo)
+        {
+        }
+
+        public void Unsubscribe(ComponentState subscriber, in CascadingParameterInfo parameterInfo)
+        {
+        }
+    }
+
+    private class SingleDeliveryConsumerComponent : IComponent
+    {
+        public RenderHandle RenderHandle { get; private set; }
+
+        [TestSingleDelivery]
+        public string CascadingValue { get; set; }
+
+        public void Attach(RenderHandle renderHandle) => RenderHandle = renderHandle;
+        public Task SetParametersAsync(ParameterView parameters) => Task.CompletedTask;
     }
 }

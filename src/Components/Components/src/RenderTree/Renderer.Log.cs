@@ -107,5 +107,16 @@ public abstract partial class Renderer
                 SkippingRenderOnDisposedComponent_Impl(logger, componentState.ComponentId, componentState.Component.GetType());
             }
         }
+
+        [LoggerMessage(10, LogLevel.Trace, "Supplying combined parameters to component {ComponentId} ({ComponentType})", EventName = "SupplyingCombinedParameters", SkipEnabledCheck = true)]
+        private static partial void SupplyingCombinedParameters_Impl(ILogger logger, int componentId, Type componentType);
+
+        public static void SupplyingCombinedParameters(ILogger logger, ComponentState componentState)
+        {
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                SupplyingCombinedParameters_Impl(logger, componentState.ComponentId, componentState.Component.GetType());
+            }
+        }
     }
 }
