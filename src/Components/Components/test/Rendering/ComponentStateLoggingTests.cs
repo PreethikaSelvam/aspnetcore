@@ -150,7 +150,8 @@ public class ComponentStateLoggingTests
         var consumerState = new ComponentState(mockRenderer, 2, consumer, supplierState);
 
         var batchBuilder = new RenderBatchBuilder();
-        var capturedEventIds = new List<int>();
+        var parameterPhaseEventIds = new List<int>();
+        var postDisposalEventIds = new List<int>();
 
         mockLogger.Reset();
         mockLogger
@@ -165,25 +166,40 @@ public class ComponentStateLoggingTests
                 It.IsAny<Func<It.IsAnyType, Exception, string>>()))
             .Callback((LogLevel level, EventId eventId, object state, Exception exception, Delegate formatter) =>
             {
-                capturedEventIds.Add(eventId.Id);
+                parameterPhaseEventIds.Add(eventId.Id);
             });
 
         consumerState.SetDirectParameters(ParameterView.Empty);
+
+        mockLogger
+            .Setup(l => l.Log(
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()))
+            .Callback((LogLevel level, EventId eventId, object state, Exception exception, Delegate formatter) =>
+            {
+                postDisposalEventIds.Add(eventId.Id);
+            });
+
         await consumerState.DisposeAsync();
         consumerState.NotifyCascadingValueChanged(ParameterViewLifetime.Unbound);
         consumerState.RenderIntoBatch(batchBuilder, builder => { }, out _);
 
-        Assert.Contains(7, capturedEventIds);
-        Assert.Contains(8, capturedEventIds);
-        Assert.Contains(9, capturedEventIds);
-        Assert.Contains(10, capturedEventIds);
+        var allEventIds = parameterPhaseEventIds.Concat(postDisposalEventIds).ToList();
+        Assert.Contains(7, allEventIds);
+        Assert.Contains(8, allEventIds);
+        Assert.Contains(9, allEventIds);
+        Assert.Contains(10, allEventIds);
 
-        var firstSkipIndex = Math.Min(capturedEventIds.IndexOf(7), capturedEventIds.IndexOf(9));
-        var lastSupplyIndex = Math.Max(
-            capturedEventIds.LastIndexOf(8),
-            capturedEventIds.LastIndexOf(10));
-        Assert.True(firstSkipIndex > lastSupplyIndex,
-            $"Disposal-skip events (7, 9) should occur after supply events (8, 10). Actual order: [{string.Join(", ", capturedEventIds)}]");
+        Assert.Contains(8, parameterPhaseEventIds);
+        Assert.Contains(10, parameterPhaseEventIds);
+
+        Assert.Contains(7, postDisposalEventIds);
+        Assert.Contains(9, postDisposalEventIds);
+        Assert.DoesNotContain(7, parameterPhaseEventIds);
+        Assert.DoesNotContain(9, parameterPhaseEventIds);
     }
 
     private class TestComponent : ComponentBase
