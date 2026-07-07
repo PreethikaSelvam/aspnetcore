@@ -279,8 +279,6 @@ public class EditContextDataAnnotationsExtensionsTest
 
     class ModelWithHiddenBaseProperty
     {
-        public object BaseName { get; set; }
-
         public object OrderID { get; set; }
 
         public object Tag { get; set; }
