@@ -195,19 +195,19 @@ public class EditContextDataAnnotationsExtensionsTest
         editContext.EnableDataAnnotationsValidation(_serviceProvider);
         var orderIdIdentifier = new FieldIdentifier(model, nameof(DerivedModelWithHiddenProperty.OrderID));
 
-        for (int i = 0; i < 5; i++)
+        var sequence = new[] { 150, 50, 200, 75, 99, 101, 1 };
+        var expected = new[] { "OrderID:range" };
+        foreach (var value in sequence)
         {
-            model.OrderID = 150 + i;
+            model.OrderID = value;
             editContext.NotifyFieldChanged(orderIdIdentifier);
-            Assert.Equal(new[] { "OrderID:range" }, editContext.GetValidationMessages());
+            var expectedMessages = (value < 1 || value > 100) ? expected : Array.Empty<string>();
+            Assert.Equal(expectedMessages, editContext.GetValidationMessages());
         }
-        model.OrderID = 150;
-        editContext.NotifyFieldChanged(orderIdIdentifier);
-        Assert.Equal(new[] { "OrderID:range" }, editContext.GetValidationMessages());
     }
 
     [Fact]
-    public void MatchesProperty_WhenCaseIsCorrect()
+    public void MatchesPropertyByExactName()
     {
         var model = new DerivedModelWithHiddenProperty { OrderID = 150 };
         var editContext = new EditContext(model);
