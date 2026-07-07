@@ -269,13 +269,15 @@ public static partial class EditContextDataAnnotationsExtensions
             {
                 // DataAnnotations only validates public properties, so that's all we'll look for
                 // If we can't find it, cache 'null' so we don't have to try again next time
-                try
+                propertyInfo = cacheKey.ModelType.GetProperty(
+                    cacheKey.FieldName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+
+                if (propertyInfo is null)
                 {
-                    propertyInfo = cacheKey.ModelType.GetProperty(cacheKey.FieldName, BindingFlags.Public | BindingFlags.Instance);
-                }
-                catch (AmbiguousMatchException)
-                {
-                    propertyInfo = cacheKey.ModelType.GetProperty(cacheKey.FieldName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                    propertyInfo = cacheKey.ModelType.GetProperty(
+                        cacheKey.FieldName,
+                        BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
                 }
 
                 // No need to lock, because it doesn't matter if we write the same value twice
