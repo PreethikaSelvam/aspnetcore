@@ -219,6 +219,22 @@ public class EditContextDataAnnotationsExtensionsTest
     }
 
     [Fact]
+    public void ValidatesInheritedPropertyFromBaseClass()
+    {
+        var model = new DerivedModelWithInheritedOnly { Description = "x" };
+        var editContext = new EditContext(model);
+        editContext.EnableDataAnnotationsValidation(_serviceProvider);
+
+        var field = new FieldIdentifier(model, nameof(DerivedModelWithInheritedOnly.BaseName));
+        editContext.NotifyFieldChanged(field);
+        Assert.Equal(new[] { "BaseName:required" }, editContext.GetValidationMessages());
+
+        model.BaseName = "ok";
+        editContext.NotifyFieldChanged(field);
+        Assert.Empty(editContext.GetValidationMessages());
+    }
+
+    [Fact]
     public void ValidatesPropertyHiddenAtMultipleInheritanceLevels()
     {
         var model = new DeepDerivedModel { Tag = 150 };
@@ -312,5 +328,16 @@ public class EditContextDataAnnotationsExtensionsTest
         public static int StaticValue { get; set; }
 
         public int Value { get; set; }
+    }
+
+    class DerivedModelWithInheritedOnly : ModelWithBaseName
+    {
+        public string Description { get; set; }
+    }
+
+    class ModelWithBaseName
+    {
+        [Required(ErrorMessage = "BaseName:required")]
+        public string BaseName { get; set; }
     }
 }
