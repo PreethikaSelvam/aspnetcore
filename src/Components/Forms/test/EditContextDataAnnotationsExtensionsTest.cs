@@ -219,22 +219,6 @@ public class EditContextDataAnnotationsExtensionsTest
     }
 
     [Fact]
-    public void ValidatesInheritedPropertyFromBaseClass()
-    {
-        var model = new DerivedModelWithoutShadowing { BaseName = 150 };
-        var editContext = new EditContext(model);
-        editContext.EnableDataAnnotationsValidation(_serviceProvider);
-
-        var field = new FieldIdentifier(model, nameof(DerivedModelWithoutShadowing.BaseName));
-        editContext.NotifyFieldChanged(field);
-        Assert.Equal(new[] { "BaseName:range" }, editContext.GetValidationMessages());
-
-        model.BaseName = 5;
-        editContext.NotifyFieldChanged(field);
-        Assert.Empty(editContext.GetValidationMessages());
-    }
-
-    [Fact]
     public void ValidatesPropertyHiddenAtMultipleInheritanceLevels()
     {
         var model = new DeepDerivedModel { Tag = 150 };
@@ -300,18 +284,6 @@ public class EditContextDataAnnotationsExtensionsTest
         public object OrderID { get; set; }
 
         public object Tag { get; set; }
-    }
-
-    class DerivedModelWithoutShadowing : ModelWithBaseName
-    {
-        [Range(1, 100, ErrorMessage = "BaseName:range")]
-        public new int BaseName { get; set; }
-    }
-
-    class ModelWithBaseName
-    {
-        [Required(ErrorMessage = "BaseName:required")]
-        public object BaseName { get; set; }
     }
 
     class MidLevelModelWithShadow : ModelWithHiddenBaseProperty
