@@ -218,6 +218,62 @@ public class EditContextDataAnnotationsExtensionsTest
         Assert.Equal(new[] { "OrderID:range" }, editContext.GetValidationMessages());
     }
 
+    [Fact]
+    public void ValidatesInheritedPropertyFromBaseClass()
+    {
+        var model = new DerivedModelWithoutShadowing { BaseName = 150 };
+        var editContext = new EditContext(model);
+        editContext.EnableDataAnnotationsValidation(_serviceProvider);
+
+        var field = new FieldIdentifier(model, nameof(DerivedModelWithoutShadowing.BaseName));
+        editContext.NotifyFieldChanged(field);
+        Assert.Equal(new[] { "BaseName:range" }, editContext.GetValidationMessages());
+
+        model.BaseName = 5;
+        editContext.NotifyFieldChanged(field);
+        Assert.Empty(editContext.GetValidationMessages());
+    }
+
+    [Fact]
+    public void ValidatesPropertyHiddenAtMultipleInheritanceLevels()
+    {
+        var model = new DeepDerivedModel { Tag = 150 };
+        var editContext = new EditContext(model);
+        editContext.EnableDataAnnotationsValidation(_serviceProvider);
+
+        var field = new FieldIdentifier(model, nameof(DeepDerivedModel.Tag));
+        editContext.NotifyFieldChanged(field);
+        Assert.Equal(new[] { "Tag:range" }, editContext.GetValidationMessages());
+
+        model.Tag = 5;
+        editContext.NotifyFieldChanged(field);
+        Assert.Empty(editContext.GetValidationMessages());
+    }
+
+    [Fact]
+    public void SkipsValidationWhenDerivedShadowHasNoAttributes()
+    {
+        var model = new DerivedModelWithUnattributedHiddenProperty { Name = null };
+        var editContext = new EditContext(model);
+        editContext.EnableDataAnnotationsValidation(_serviceProvider);
+
+        var field = new FieldIdentifier(model, nameof(DerivedModelWithUnattributedHiddenProperty.Name));
+        editContext.NotifyFieldChanged(field);
+        Assert.Empty(editContext.GetValidationMessages());
+    }
+
+    [Fact]
+    public void IgnoresStaticProperty()
+    {
+        var model = new ModelWithStaticProperty { Value = 0 };
+        var editContext = new EditContext(model);
+        editContext.EnableDataAnnotationsValidation(_serviceProvider);
+
+        var field = new FieldIdentifier(model, nameof(ModelWithStaticProperty.StaticValue));
+        editContext.NotifyFieldChanged(field);
+        Assert.Empty(editContext.GetValidationMessages());
+    }
+
     class TestModel
     {
         [Required(ErrorMessage = "RequiredString:required")] public string RequiredString { get; set; }
@@ -239,6 +295,52 @@ public class EditContextDataAnnotationsExtensionsTest
 
     class ModelWithHiddenBaseProperty
     {
+        public object BaseName { get; set; }
+
         public object OrderID { get; set; }
+
+        public object Tag { get; set; }
+    }
+
+    class DerivedModelWithoutShadowing : ModelWithBaseName
+    {
+        [Range(1, 100, ErrorMessage = "BaseName:range")]
+        public new int BaseName { get; set; }
+    }
+
+    class ModelWithBaseName
+    {
+        [Required(ErrorMessage = "BaseName:required")]
+        public object BaseName { get; set; }
+    }
+
+    class MidLevelModelWithShadow : ModelWithHiddenBaseProperty
+    {
+        public new string Tag { get; set; }
+    }
+
+    class DeepDerivedModel : MidLevelModelWithShadow
+    {
+        [Range(1, 100, ErrorMessage = "Tag:range")]
+        public new int Tag { get; set; }
+    }
+
+    class DerivedModelWithUnattributedHiddenProperty : ModelWithNamedBase
+    {
+        public new string Name { get; set; }
+    }
+
+    class ModelWithNamedBase
+    {
+        [Required(ErrorMessage = "Name:required")]
+        public object Name { get; set; }
+    }
+
+    class ModelWithStaticProperty
+    {
+        [Range(1, 100, ErrorMessage = "StaticValue:range")]
+        public static int StaticValue { get; set; }
+
+        public int Value { get; set; }
     }
 }
