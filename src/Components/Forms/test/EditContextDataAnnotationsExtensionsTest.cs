@@ -272,6 +272,9 @@ public class EditContextDataAnnotationsExtensionsTest
         var field = new FieldIdentifier(model, nameof(ModelWithStaticProperty.StaticValue));
         editContext.NotifyFieldChanged(field);
         Assert.Empty(editContext.GetValidationMessages());
+    }
+
+    [Fact]
     public Task FormLevelAsyncValidationProducesMessages() => RunOnDispatcher(async () =>
     {
         var model = new AsyncTestModel();
