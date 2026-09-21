@@ -543,6 +543,7 @@
         "Program.cs",
         "Properties/launchSettings.json",
         "wwwroot/app.css",
+        "wwwroot/theme.js",
         "wwwroot/favicon.png",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map",
@@ -675,6 +676,7 @@
         "Program.cs",
         "Properties/launchSettings.json",
         "wwwroot/app.css",
+        "wwwroot/theme.js",
         "wwwroot/favicon.png",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map",
@@ -750,6 +752,7 @@
         "Components/Pages/Weather.razor",
         "Properties/launchSettings.json",
         "wwwroot/app.css",
+        "wwwroot/theme.js",
         "wwwroot/favicon.png",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map",
@@ -885,6 +888,7 @@
         "Program.cs",
         "Properties/launchSettings.json",
         "wwwroot/app.css",
+        "wwwroot/theme.js",
         "wwwroot/favicon.png",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map",
@@ -1020,6 +1024,7 @@
         "Program.cs",
         "Properties/launchSettings.json",
         "wwwroot/app.css",
+        "wwwroot/theme.js",
         "wwwroot/favicon.png",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map",
@@ -1533,6 +1538,7 @@
         "Properties/launchSettings.json",
         "{ProjectName}.csproj",
         "wwwroot/app.css",
+        "wwwroot/theme.js",
         "wwwroot/favicon.png",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map",
@@ -1755,7 +1761,8 @@
         "Components/Pages/Home.razor",
         "Components/Pages/NotFound.razor",
         "Properties/launchSettings.json",
-        "wwwroot/app.css"
+        "wwwroot/app.css",
+        "wwwroot/theme.js"
       ],
       "AuthOption": "None"
     },
@@ -1779,7 +1786,8 @@
         "Components/Pages/Home.razor",
         "Components/Pages/NotFound.razor",
         "Properties/launchSettings.json",
-        "wwwroot/app.css"
+        "wwwroot/app.css",
+        "wwwroot/theme.js"
       ],
       "AuthOption": "None"
     },
@@ -2012,6 +2020,7 @@
         "Program.cs",
         "Properties/launchSettings.json",
         "wwwroot/app.css",
+        "wwwroot/theme.js",
         "wwwroot/favicon.png",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css",
         "wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map",
