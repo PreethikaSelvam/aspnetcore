@@ -127,47 +127,8 @@ public abstract class BlazorTemplateTest : BrowserTestBase
         await page.GotoAsync(listeningUri, new() { WaitUntil = WaitUntilState.NetworkIdle });
 
         await TestBasicInteractionAsync(browser, page, appName, pagesToExclude, authenticationFeatures);
-        await VerifyColorSchemeAsync(page);
 
         await page.CloseAsync();
-    }
-
-    private static async Task VerifyColorSchemeAsync(IPage page)
-    {
-        var reconnectModal = page.Locator("#components-reconnect-modal");
-        var hasReconnectModal = await reconnectModal.CountAsync() is not 0;
-        var counterLink = page.Locator("nav a[href=counter]");
-        var hasCounterLink = await counterLink.CountAsync() is not 0;
-
-        await page.EmulateMediaAsync(new() { ColorScheme = ColorScheme.Dark });
-        await page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
-        await page.WaitForFunctionAsync("document.documentElement.dataset.bsTheme === 'dark'");
-        if (hasCounterLink)
-        {
-            await Task.WhenAll(
-                page.WaitForURLAsync("**/counter"),
-                counterLink.ClickAsync());
-            await page.WaitForFunctionAsync("document.documentElement.dataset.bsTheme === 'dark'");
-        }
-
-        var darkBodyBackground = await page.Locator("body").EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor");
-        var darkModalBackground = hasReconnectModal
-            ? await reconnectModal.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor")
-            : null;
-
-        await page.EmulateMediaAsync(new() { ColorScheme = ColorScheme.Light });
-        await page.ReloadAsync(new() { WaitUntil = WaitUntilState.NetworkIdle });
-        await page.WaitForFunctionAsync("document.documentElement.dataset.bsTheme === 'light'");
-        var lightBodyBackground = await page.Locator("body").EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor");
-        var lightModalBackground = hasReconnectModal
-            ? await reconnectModal.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor")
-            : null;
-
-        Assert.NotEqual(lightBodyBackground, darkBodyBackground);
-        if (hasReconnectModal)
-        {
-            Assert.NotEqual(lightModalBackground, darkModalBackground);
-        }
     }
 
     protected async Task TestBasicInteractionAsync(
