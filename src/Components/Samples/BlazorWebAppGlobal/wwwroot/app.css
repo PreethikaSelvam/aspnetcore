@@ -1,5 +1,10 @@
-html {
-    color-scheme: light dark;
+:root,
+:root[data-bs-theme="light"] {
+    color-scheme: light;
+}
+
+:root[data-bs-theme="dark"] {
+    color-scheme: dark;
 }
 
 body {
