@@ -12,18 +12,134 @@ using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.InternalTesting;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
+using Microsoft.DotNet.RemoteExecutor;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace Microsoft.AspNetCore.Components.Endpoints.Tests;
 public class RazorComponentEndpointInvokerTest
 {
+    [ConditionalTheory]
+    [RemoteExecutionSupported]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Invoker_StreamingFormRedirect_WaitsForPendingHtmlFlush(bool disableThrowNavigationException, bool enhanced)
+    {
+        var options = new RemoteInvokeOptions();
+        options.RuntimeConfigurationOptions.Add(
+            "Microsoft.AspNetCore.Components.Endpoints.NavigationManager.DisableThrowNavigationException",
+            disableThrowNavigationException.ToString().ToLowerInvariant());
+
+        using var remoteHandle = RemoteExecutor.Invoke(static async enhancedString =>
+        {
+            await using var services = CreateRedirectingPageServices();
+            var state = services.GetRequiredService<StreamingRedirectState>();
+            await using var renderer = new EndpointHtmlRenderer(services, NullLoggerFactory.Instance);
+            var invoker = new RazorComponentEndpointInvoker(renderer, NullLogger<RazorComponentEndpointInvoker>.Instance);
+            var context = CreateRedirectingPageContext(services, typeof(StreamingRedirectForm));
+            context.Request.Method = "POST";
+            context.Request.ContentType = "application/x-www-form-urlencoded";
+            var form = Encoding.UTF8.GetBytes("_handler=save");
+            context.Request.Body = new MemoryStream(form);
+            context.Request.ContentLength = form.Length;
+            if (bool.Parse(enhancedString))
+            {
+                context.Request.Headers.Accept = "text/html; blazor-enhanced-nav=on";
+            }
+
+            var responseFeature = new Mock<HttpResponseFeature> { CallBase = true };
+            responseFeature.Setup(feature => feature.HasStarted).Returns(() => state.FirstWrite.Task.IsCompleted);
+            context.Features.Set<IHttpResponseFeature>(responseFeature.Object);
+            context.Response.Body = new GatedResponseStream(state);
+
+            var rendering = invoker.Render(context);
+            try
+            {
+                await state.NavigationIssued.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            finally
+            {
+                state.ReleaseWrite.TrySetResult();
+            }
+            await rendering.WaitAsync(TimeSpan.FromSeconds(10));
+
+            var body = await ReadBody(context);
+            Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
+            var htmlEnd = body.IndexOf("</html>", StringComparison.Ordinal);
+            var redirect = body.IndexOf("<blazor-ssr><template type=\"redirection\"", StringComparison.Ordinal);
+            Assert.True(htmlEnd >= 0);
+            Assert.True(redirect > htmlEnd, $"Redirect at {redirect} precedes HTML end at {htmlEnd}.");
+            if (bool.Parse(enhancedString))
+            {
+                var framing = $"<!--{context.Response.Headers["ssr-framing"]}-->";
+                var framingIndex = body.IndexOf(framing, StringComparison.Ordinal);
+                Assert.True(framingIndex > htmlEnd && framingIndex < redirect);
+            }
+        }, enhanced.ToString(), options);
+    }
+
+    private sealed class StreamingRedirectState
+    {
+        public TaskCompletionSource FirstWrite { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource NavigationIssued { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource ReleaseWrite { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class GatedResponseStream(StreamingRedirectState state) : MemoryStream
+    {
+        public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await base.WriteAsync(buffer, cancellationToken);
+            if (state.FirstWrite.TrySetResult())
+            {
+                await state.ReleaseWrite.Task;
+            }
+        }
+    }
+
+    [StreamRendering]
+    private sealed class StreamingRedirectForm : ComponentBase
+    {
+        [Inject] public NavigationManager Navigation { get; set; } = default!;
+        [Inject] public StreamingRedirectState State { get; set; } = default!;
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenElement(0, "html");
+            builder.OpenElement(1, "form");
+            builder.AddAttribute(2, "method", "post");
+            builder.AddAttribute(3, "onsubmit", EventCallback.Factory.Create(this, SaveAsync));
+            builder.AddNamedEvent("onsubmit", "save");
+            builder.CloseElement();
+            builder.AddContent(4, new string('x', 70000));
+            builder.CloseElement();
+        }
+
+        private async Task SaveAsync()
+        {
+            await State.FirstWrite.Task;
+            try
+            {
+                Navigation.NavigateTo("/redirected");
+            }
+            finally
+            {
+                State.NavigationIssued.SetResult();
+            }
+        }
+    }
+
     [Fact]
     public async Task Invoker_RedirectWhileInitializingChildren_DoesNotWriteUninitializedComponentFrames()
     {
@@ -74,6 +190,7 @@ public class RazorComponentEndpointInvokerTest
             .AddSingleton<IWebHostEnvironment>(new TestWebHostEnvironment())
             .AddSingleton<IHostEnvironment>(sp => sp.GetRequiredService<IWebHostEnvironment>())
             .AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider())
+            .AddSingleton<StreamingRedirectState>()
             .BuildServiceProvider();
 
     private static DefaultHttpContext CreateRedirectingPageContext(

@@ -128,11 +128,20 @@ internal partial class EndpointHtmlRenderer
     {
         if (_httpContext.Response.HasStarted)
         {
-            var defaultBufferSize = 16 * 1024;
-            await using var writer = new HttpResponseStreamWriter(_httpContext.Response.Body, Encoding.UTF8, defaultBufferSize, ArrayPool<byte>.Shared, ArrayPool<char>.Shared);
-            using var bufferWriter = new BufferedTextWriter(writer);
-            HandleNavigationAfterResponseStarted(bufferWriter, _httpContext, uri);
-            await bufferWriter.FlushAsync();
+            if (_streamingUpdatesWriter is { } streamingWriter)
+            {
+                // Queue the redirect behind any page or batch flush that is still in progress.
+                HandleNavigationAfterResponseStarted(streamingWriter, _httpContext, uri);
+                await streamingWriter.FlushAsync();
+            }
+            else
+            {
+                var defaultBufferSize = 16 * 1024;
+                await using var writer = new HttpResponseStreamWriter(_httpContext.Response.Body, Encoding.UTF8, defaultBufferSize, ArrayPool<byte>.Shared, ArrayPool<char>.Shared);
+                using var bufferWriter = new BufferedTextWriter(writer);
+                HandleNavigationAfterResponseStarted(bufferWriter, _httpContext, uri);
+                await bufferWriter.FlushAsync();
+            }
         }
         else
         {
